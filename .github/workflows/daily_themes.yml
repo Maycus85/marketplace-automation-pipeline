@@ -76,4 +76,5 @@ jobs:
           git config user.email "bot@etsy-automation"
           git add themes.json themes_today.json listing_today.json
           git commit -m "Daily pipeline: $(date +'%Y-%m-%d')"
-          git push
+          git pull --rebase origin main || true
+          git push || true
