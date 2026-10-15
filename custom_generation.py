@@ -58,10 +58,7 @@ def build_item_prompts(theme: str, n: int, style: str) -> list:
         "silhouette": "dark silhouette shapes, no color or detail",
     }
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=500,
-        messages=[{"role": "user", "content": f"""Generate exactly {n} distinct clipart item descriptions for the theme: "{theme}"
+    prompt = f"""Generate exactly {n} distinct clipart item descriptions for the theme: "{theme}"
 
 Style: {style_hints.get(style, "watercolor illustration")}
 
@@ -71,12 +68,27 @@ Rules:
 - No duplicates
 - All items must relate directly to the theme
 
-Respond ONLY with a JSON array of {n} strings."""}]
-    )
-    text = message.content[0].text.strip()
-    text = re.sub(r"```json\s*|```\s*", "", text).strip()
-    return json.loads(text)
+Respond ONLY with a JSON array of {n} strings."""
 
+    for attempt in range(2):
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        if message.stop_reason == "max_tokens":
+            print("  Warning: response truncated, retrying...")
+            continue
+        text = message.content[0].text.strip()
+        text = re.sub(r"```json\s*|```\s*", "", text).strip()
+        try:
+            items = json.loads(text)
+        except json.JSONDecodeError as e:
+            print(f"  JSON error: {e}, retrying...")
+            continue
+        return items[:n]
+
+    raise RuntimeError("Could not get a valid item list from Claude")
 
 def generate_image(prompt: str, output_path: Path) -> bool:
     try:
